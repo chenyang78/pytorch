@@ -480,11 +480,11 @@ class FullyShardedDataParallel(nn.Module, _FSDPState):
     @property
     def _has_params(self) -> bool:
         """Returns whether this FSDP instance manages any parameters."""
-        return hasattr(self, "_handles") and len(self._handles) > 0
+        return hasattr(self, "_handle") and self._handle > 0
 
     @property
     def _flat_param(self) -> Optional[FlatParameter]:
-        return self._handles[0].flat_param if self._handles else None
+        return self._handle.flat_param if self._handle else None
 
     def __getattr__(self, name: str) -> Any:
         """Forward missing attributes to the wrapped module."""
@@ -791,13 +791,14 @@ class FullyShardedDataParallel(nn.Module, _FSDPState):
             unused = None
             args, kwargs = _pre_forward(
                 self,
-                self._handles,
+                self._handle,
                 _pre_forward_unshard,
                 self._fsdp_wrapped_module,
                 args,
                 kwargs,
             )
-            for handle in self._handles:
+            handle = self._handle
+            if handle:
                 _p_assert(
                     handle.flat_param.device == self.compute_device,
                     "Expected `FlatParameter` to be on the compute device "
@@ -805,7 +806,7 @@ class FullyShardedDataParallel(nn.Module, _FSDPState):
                 )
             output = self._fsdp_wrapped_module(*args, **kwargs)
             return _post_forward(
-                self, self._handles, _post_forward_reshard, self, unused, output
+                self, self._handle, _post_forward_reshard, self, unused, output
             )
 
     @staticmethod
